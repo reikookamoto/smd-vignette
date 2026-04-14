@@ -1,0 +1,234 @@
+---
+title: "Understanding Standardized Mean Differences (SMD)"
+author: "Reiko Okamoto"
+format:
+  html:
+    toc: true
+    toc-depth: 2
+    embed-resources: true
+---
+
+By the end, you should understand:
+
+-   *Why* standardized mean differences (SMDs) are used
+-   *What* an SMD is measuring (at a high level)
+-   *How* SMDs are calculated for continuous vs. categorical variables
+-   *How* to interpret them
+-   *What they do **not** tell you*
+
+This should also make the behavior of the `smd::smd()` function in R feel much less mysterious.
+
+## Why do we want to use SMD?
+
+### 1. A unified, comparable measure
+
+Baseline tables often include a mix of:
+
+-   Continuous variables (e.g., age, BMI)
+-   Binary variables (e.g., sex, smoking status)
+-   Multi-level categorical variables (e.g., education, income quintile)
+
+Traditionally, these are compared using different tools:
+
+-   *t*-tests for continuous variables
+-   Chi-squared tests for categorical variables
+-   Fisher’s exact test when counts are small
+
+This leads to **results that are not directly comparable across variables**.
+
+**SMD solves this by putting all variables on a common, unitless scale.**
+
+> An SMD of 0.3 reflects the same **magnitude of between-group difference**, whether the variable is age, sex, or education level.
+
+This makes SMDs especially powerful for:
+
+-   Descriptive baseline tables
+-   Assessing covariate balance before and after weighting or matching
+
+### 2. Observational studies ask a different question
+
+In non-randomized studies (e.g., cohort studies):
+
+-   Groups are **expected** to differ
+-   The scientific question is **how much**, not *whether*, they differ
+
+Hypothesis tests (and *p*-values) answer a different question:
+
+> “Are the population parameters exactly equal?”
+
+With large samples, trivial differences can become statistically significant. With small samples, important differences may not be.
+
+**SMDs focus on magnitude, not statistical significance.**
+
+## What is an SMD, conceptually?
+
+At its core, an SMD is an **effect size**.
+
+Very loosely:
+
+$$
+\text{Effect size} \approx \frac{\text{difference between groups}}{\text{variability}}
+$$
+
+This idea shows up everywhere in statistics.
+
+A helpful mental model is:
+
+> **How far apart are the groups, relative to how noisy the data are?**
+
+If variability is small, the same absolute difference looks *big*. If variability is large, that same difference looks *small*.
+
+## SMD for continuous variables
+
+For a continuous variable (e.g., age), the SMD is typically:
+
+$$
+\text{SMD} = \frac{\bar{x}_1 - \bar{x}_2}{s_{\text{pooled}}}
+$$
+
+where:
+
+-   $\bar{x}_1, \bar{x}_2$ are group means
+-   $s_{\text{pooled}}$ is the pooled standard deviation
+
+Key intuition:
+
+-   The numerator is the *difference in means*
+-   The denominator rescales that difference by overall variability
+
+This is essentially **Cohen’s *d***.
+
+------------------------------------------------------------------------
+
+## SMD for dichotomous (binary) variables
+
+Binary variables (e.g., sex, smoking status, yes/no indicators) are a special case of categorical variables with only two levels. For a binary variable coded 0/1, the SMD can be computed as:
+
+$$
+\text{SMD} = \frac{p_1 - p_2}{\sqrt{\frac{p_1(1-p_1) + p_2(1-p_2)}{2}}}
+$$
+
+where:
+
+-   $p_1$ and $p_2$ are the proportions of 1's in each group
+-   The denominator is a **pooled Bernoulli variance**, exactly as shown in the SAS article
+
+Key points:
+
+-   This formula is mathematically equivalent to applying Cohen's *d* to a 0/1 variable
+
+## SMD for categorical variables
+
+This is where things often feel opaque.
+
+### 1. Start with indicator variables
+
+A categorical variable with $K$ levels is represented internally as $K-1$ indicator (dummy) variables.
+
+Each group therefore has a **vector of proportions**, not a single number.
+
+### 2. Measuring distance between vectors
+
+To compare two vectors of proportions, we need a notion of *distance*.
+
+**Euclidean distance** fails here because it:
+
+1.  Assumes equal variance across categories
+2.  Assumes independence between categories (which is false, since proportions must sum to 1)
+
+### 3. Mahalanobis distance
+
+To compare two vectors of proportions, SMDs for categorical variables use the **Mahalanobis distance**:
+
+$$
+D^2 = (\mathbf{p}_1 - \mathbf{p}_2)^T \Sigma^{-1} (\mathbf{p}_1 - \mathbf{p}_2)
+$$
+
+where:
+
+-   $\mathbf{p}_1, \mathbf{p}_2$ are vectors of category proportions
+-   $\Sigma$ is the covariance matrix of those proportions
+
+This is the multivariate analogue of:
+
+$$
+\text{standardized difference} = \frac{\text{difference}}{\text{variance}}
+$$
+
+It accounts for:
+
+-   Different variances across categories
+-   Correlation between categories (since proportions must sum to 1)
+
+> **Key insight:**\
+> SMDs for categorical variables are *exactly* Mahalanobis distances under the hood.
+
+### 4. Why categorical SMDs are non-negative
+
+Mahalanobis distance is a *distance*. Distances:
+
+-   Are always ≥ 0
+-   Have no direction
+
+## How do you interpret SMD?
+
+A common reference comes from Cohen (1988):
+
+-   **0.2** → small difference
+-   **0.5** → medium difference
+-   **0.8** → large difference
+
+Important caveats:
+
+-   These are **rules of thumb**, not hard cutoffs
+-   Context matters (population, outcome, study purpose)
+
+## Limitations and caveats of SMD
+
+### 1. No accepted threshold for “significance”
+
+There is **no universally accepted SMD cutoff** that defines a meaningful difference.
+
+This aligns with software behavior:
+
+-   `gtsummary::add_difference()` does not report *p*-values for standardized mean difference
+
+### 2. Loss of direction for categorical variables
+
+Because categorical SMDs are distances:
+
+-   You cannot tell *which* group over-represents a category from the SMD alone
+-   Directional information must come from the raw proportions
+
+### 3. Sensitivity to variability
+
+Because:
+
+$$
+\text{SMD} \propto \frac{\text{difference}}{\text{variance}}
+$$
+
+High sampling variability increases the denominator, which:
+
+-   Shrinks the SMD
+-   Can make meaningful differences appear small
+
+This is not a flaw—it reflects genuine uncertainty—but it reinforces the need for careful interpretation.
+
+## Putting it all together
+
+Think of SMD as answering one clean question:
+
+> **How different are these groups, relative to the variability in the data, using a single common scale?**
+
+That is why SMDs:
+
+-   Are ideal for baseline tables
+-   Are preferred in observational studies
+-   Behave the way they do in `smd::smd()`
+
+Once you see SMDs as *effect sizes* and categorical SMDs as *distances*, the entire framework becomes much more intuitive 😊
+
+## Reference
+
+-   Yang, D., & Dalton, J. E. (2012) [https://support.sas.com/resources/papers/proceedings12/335-2012.pdf]().

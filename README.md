@@ -1,2 +1,2 @@
 # smd-vignette
-Deep-dive into standardized mean difference
+This directory contains a Quarto document exploring why standardized mean differences are useful in cohort studies with non‑random group assignment, and clarifying what `smd::smd()` is doing under the hood. It was written to make SMDs feel more intuitive and less foreign.
